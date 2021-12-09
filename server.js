@@ -3,8 +3,6 @@ const express = require('express');
 const cors = require('cors');
 const shortid = require('shortid');
 const validurl = require('valid-url')
-const dns = require('dns')
-
 const app = express();
 
 // Basic Configuration
@@ -13,6 +11,7 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 
 app.use('/public', express.static(`${process.cwd()}/public`));
+app.use(express.urlencoded({extended:true}))
 
 app.get('/', function(req, res) {
   res.sendFile(process.cwd() + '/views/index.html');
@@ -25,7 +24,7 @@ mongoose.connect('mongodb://localhost:27017/shorturl')
 .catch((e)=>console.log(e))
 
 const urlschema = new mongoose.Schema({
-  origin_url:String,
+  original_url:String,
   short_url:String
 })
 const Url = mongoose.model('Url',urlschema)
@@ -33,30 +32,39 @@ const Url = mongoose.model('Url',urlschema)
 // Your first API endpoint
 
 app.get('/api/shorturl/:short_url', async function(req, res) {
-  const urlcode = req.params.short_url
-  let result = await Url.findOne({urlcode})
-  .then(result?res.redirect(result.origin_url):res.json({error:'No url found'}))
-  .catch((err)=>{console.log(err), res.json({error:'server error'})})
+  const shortcode = req.params.short_url
+  let url = await Url.findOne({short_url:shortcode})
+  console.log(url)
+  try {
+    if(url){
+      console.log(url.original_url)
+      return res.redirect(url.original_url)
+    }else{
+      return res.json({error:'No url found'})
+    }
+  } catch (error) {
+    console.log(error), res.json({error:'server error'})
+  }
 })
 
 
-app.post('/api/shorturl/new', async function(req, res) {
-  const url = req.body.url
-  const urlcode = shortid.generate()
-
-  if(!validurl.isWebUri(url)){
-    res.json({error:'Invalid URL'})
-  }else{
-    let result = await Url.findOne({
-      origin_url:url
-    })
-    .then(result?res.json({origin_url:result.origin_url,short_url:result.short_url}) : result = await new Url({origin_url:url,short_url:urlcode}),
-      await result.save(),
-      res.json({origin_url:result.origin_url,short_url:result.short_url})
-    )
-    .catch((err)=>{console.log(err), res.json({error:'server error'})})
+app.post('/api/shorturl', async function(req, res) {
+  try{
+    const url = req.body.url
+     const urlcode = shortid.generate()
+    if(!validurl.isWebUri(url)){
+      res.json({error:'invalid url'})
+    }else{
+      const result = await new Url({original_url:url,short_url:urlcode})
+      await result.save()
+      res.json({original_url:result.original_url,short_url:result.short_url})
+      console.log(result)
+    }
+  }catch (error) {
+      console.log(error), 
+      res.json({error:'server error'})
   }
-});
+}); 
 
 app.listen(port, function() {
   console.log(`Listening on port ${port}`);
