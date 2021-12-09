@@ -32,7 +32,7 @@ const Url = mongoose.model('Url',urlschema)
 
 // Your first API endpoint
 
-app.post('/api/shorturl/:short_url', async function(req, res) {
+app.get('/api/shorturl/:short_url', async function(req, res) {
   const urlcode = req.params.short_url
   let result = await Url.findOne({urlcode})
   .then(result?res.redirect(result.origin_url):res.json({error:'No url found'}))
